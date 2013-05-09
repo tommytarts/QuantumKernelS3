@@ -202,7 +202,7 @@ static void hotplug_decision_work_fn(struct work_struct *work)
 
 }
 
-static void hotplug_online_all_work_fn(struct work_struct *work)
+static void __ref hotplug_online_all_work_fn(struct work_struct *work)
 {
 	int cpu;
 	for_each_possible_cpu(cpu) {
@@ -218,7 +218,7 @@ static void hotplug_online_all_work_fn(struct work_struct *work)
 	schedule_delayed_work_on(0, &hotplug_decision_work, MIN_SAMPLING_RATE);
 }
 
-static void hotplug_offline_all_work_fn(struct work_struct *work)
+static void __ref hotplug_offline_all_work_fn(struct work_struct *work)
 {
 	int cpu;
 	for_each_possible_cpu(cpu) {
@@ -229,7 +229,7 @@ static void hotplug_offline_all_work_fn(struct work_struct *work)
 	}
 }
 
-static void hotplug_online_single_work_fn(struct work_struct *work)
+static void __ref hotplug_online_single_work_fn(struct work_struct *work)
 {
 	int cpu;
 
@@ -245,7 +245,7 @@ static void hotplug_online_single_work_fn(struct work_struct *work)
 	schedule_delayed_work_on(0, &hotplug_decision_work, MIN_SAMPLING_RATE);
 }
 
-static void hotplug_offline_work_fn(struct work_struct *work)
+static void __ref hotplug_offline_work_fn(struct work_struct *work)
 {
 	int cpu;
 	for_each_online_cpu(cpu) {
