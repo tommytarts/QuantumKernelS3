@@ -660,7 +660,11 @@ CONFIG_VIRT_TO_BUS=y
 CONFIG_KSM=y
 CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
 CONFIG_CLEANCACHE=y
+<<<<<<< HEAD:arch/arm/configs/cyanogen_d2dcm_defconfig
 CONFIG_USE_USER_ACCESSIBLE_TIMERS=y
+=======
+CONFIG_DYNAMIC_PAGE_WRITEBACK=y
+>>>>>>> ad1961a... mm: Dynamic management of dirty page writebacks:arch/arm/configs/flo_defconfig
 # CONFIG_ARCH_MEMORY_PROBE is not set
 # CONFIG_ARCH_MEMORY_REMOVE is not set
 # CONFIG_ENABLE_DMM is not set
