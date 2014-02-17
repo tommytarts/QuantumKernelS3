@@ -388,7 +388,6 @@ extern struct cpufreq_governor cpufreq_gov_smartmax;
 extern struct cpufreq_governor cpufreq_gov_intelliactive;
 #define CPUFREQ_DEFAULT_GOVERNOR        (&cpufreq_gov_intelliactive)
 #endif
-#endif
 
 
 /*********************************************************************
