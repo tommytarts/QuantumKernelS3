@@ -193,7 +193,7 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 export KBUILD_BUILDHOST := $(SUBARCH)
 ARCH		?= arm
-CROSS_COMPILE	?= /home/tom/qk/linaro/bin/arm-cortex_a15-linux-gnueabihf-
+CROSS_COMPILE	?= /home/tom/qk/linaro15/bin/arm-cortex_a15-linux-gnueabihf-
 
 # Architecture as present in compile.h
 UTS_MACHINE 	:= $(ARCH)
@@ -245,8 +245,8 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 
 HOSTCC       = gcc
 HOSTCXX      = g++
-HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O3 -fomit-frame-pointer
-HOSTCXXFLAGS = -O3
+HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O3 -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr -fsingle-precision-constant -ftree-vectorize -fomit-frame-pointer
+HOSTCXXFLAGS = -O3 -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr -fsingle-precision-constant -mcpu=cortex-a15 -mtune=cortex-a15 -marm -mfpu=neon-vfpv4 -ftree-vectorize -mvectorize-with-neon-quad
 
 # Decide whether to build built-in, modular, or both.
 # Normally, just do built-in.
@@ -354,13 +354,14 @@ CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 CFLAGS_MODULE   =
 AFLAGS_MODULE   =
 LDFLAGS_MODULE  =
-CFLAGS_KERNEL	= -mcpu=cortex-a15 -mtune=cortex-a15 -mfpu=neon-vfpv4 -ffast-math -ftree-vectorize -pipe
-AFLAGS_KERNEL	= -mcpu=cortex-a15 -mtune=cortex-a15 -mfpu=neon-vfpv4 -ffast-math -ftree-vectorize -pipe
+CFLAGS_KERNEL	= -O3 -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr -ffast-math -fsingle-precision-constant -mcpu=cortex-a15 -mtune=cortex-a15 -marm -mfpu=neon-vfpv4 -funswitch-loops -mvectorize-with-neon-quad
+AFLAGS_KERNEL	= -O3 -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr -ffast-math -fsingle-precision-constant -mcpu=cortex-a15 -mtune=cortex-a15 -marm -mfpu=neon-vfpv4 -funswitch-loops -mvectorize-with-neon-quad
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
-XX_A9		= -marm -mfloat-abi=softfp \
-		  -funsafe-math-optimizations -funroll-loops -mvectorize-with-neon-quad
-XX_GRAPHITE	= -fgraphite-identity -floop-block -ftree-loop-linear \
-		  -floop-strip-mine -ftree-loop-distribution
+XX_A9		= -marm -mfloat-abi=hard \
+		  -mvectorize-with-neon-quad
+XX_GRAPHITE	= -fgraphite-identity -ftree-loop-distribution -floop-block -ftree-loop-linear \
+		  -ftree-loop-im -fivopts -funswitch-loops -funroll-loops -floop-strip-mine \
+		  -ftree-loop-ivcanon
 XX_MODULO	= -fmodulo-sched -fmodulo-sched-allow-regmoves
 
 
@@ -376,16 +377,13 @@ KBUILD_CPPFLAGS := -D__KERNEL__
 KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
-		   -Wno-format-security \
-		   -finline-functions \
-		   -fgcse-after-reload \
-		   -ftree-partial-pre \
-		   -fipa-cp-clone \
+		   -Wno-format-security -Wno-unused-function -Wno-array-bounds -Wno-uninitialized \
+		   -fno-delete-null-pointer-checks -Wno-unused-variable -Wno-maybe-uninitialized -Wno-cpp -Wno-declaration-after-statement \
 		   -mcpu=cortex-a15 -mtune=cortex-a15 -mfpu=neon-vfpv4 \
-		   -ftree-vectorize -pipe \
-		   -fno-delete-null-pointer-checks \
-		   -funswitch-loops -fpredictive-commoning \
-		    $(XX_A9) $(XX_GRAPHITE) $(XX_MODULO)
+		   -fpredictive-commoning -fgcse-after-reload -ftree-vectorize \
+		   -fipa-cp-clone -fsingle-precision-constant -pipe \
+		   -funswitch-loops
+		   $(XX_A9) $(XX_GRAPHITE) $(XX_MODULO)
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
 KBUILD_AFLAGS   := -D__ASSEMBLY__
