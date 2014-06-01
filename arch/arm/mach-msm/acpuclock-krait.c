@@ -1061,8 +1061,8 @@ static const int krait_needs_vmin(void)
 static void krait_apply_vmin(struct acpu_level *tbl)
 {
 	for (; tbl->speed.khz != 0; tbl++) {
-		if (tbl->vdd_core < 900000)
-			tbl->vdd_core = 900000;
+		if (tbl->vdd_core < 975000)
+			tbl->vdd_core = 975000;
 		tbl->avsdscr_setting = 0;
 	}
 }
