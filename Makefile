@@ -359,11 +359,9 @@ AFLAGS_KERNEL	= -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr -fsingle-prec
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 XX_A9		= -marm \
 		  -mvectorize-with-neon-quad
-XX_GRAPHITE	= -fgraphite-identity -ftree-loop-distribution -floop-block -ftree-loop-linear \
-		  -ftree-loop-im -fivopts -funswitch-loops -funroll-loops -floop-strip-mine \
+XX_GRAPHITE	= -ftree-loop-distribution \
+		  -ftree-loop-im -fivopts -funswitch-loops -funroll-loops \
 		  -ftree-loop-ivcanon
-XX_MODULO	= -fmodulo-sched -fmodulo-sched-allow-regmoves
-
 
 # Use LINUXINCLUDE when you must reference the include/ directory.
 # Needed to be compatible with the O= option
