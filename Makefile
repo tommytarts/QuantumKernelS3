@@ -357,11 +357,6 @@ LDFLAGS_MODULE  =
 CFLAGS_KERNEL	= -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr -fsingle-precision-constant -mcpu=cortex-a15 -mtune=cortex-a15 -marm -mfpu=neon-vfpv4 -funswitch-loops
 AFLAGS_KERNEL	= -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr -fsingle-precision-constant -mcpu=cortex-a15 -mtune=cortex-a15 -marm -mfpu=neon-vfpv4 -funswitch-loops
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
-XX_A9		= -marm \
-		  -mvectorize-with-neon-quad
-XX_GRAPHITE	= -ftree-loop-distribution \
-		  -ftree-loop-im -fivopts -funswitch-loops -funroll-loops \
-		  -ftree-loop-ivcanon
 
 # Use LINUXINCLUDE when you must reference the include/ directory.
 # Needed to be compatible with the O= option
@@ -380,8 +375,7 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -mcpu=cortex-a15 -mtune=cortex-a15 -mfpu=neon-vfpv4 \
 		   -fpredictive-commoning -fgcse-after-reload -ftree-vectorize \
 		   -fipa-cp-clone -fsingle-precision-constant -pipe \
-		   -funswitch-loops \
-		   $(XX_A9) $(XX_GRAPHITE) $(XX_MODULO)
+		   -funswitch-loops
 KBUILD_AFLAGS_KERNEL := -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr -fsingle-precision-constant -mcpu=cortex-a15 -mtune=cortex-a15 -marm -mfpu=neon-vfpv4 -ftree-vectorize
 KBUILD_CFLAGS_KERNEL := -fgcse-lm -fgcse-sm -fsched-spec-load -fforce-addr -fsingle-precision-constant -mcpu=cortex-a15 -mtune=cortex-a15 -marm -mfpu=neon-vfpv4 -ftree-vectorize
 KBUILD_AFLAGS   := -D__ASSEMBLY__
