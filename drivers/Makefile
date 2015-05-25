@@ -126,12 +126,13 @@ obj-y				+= platform/
 obj-y				+= ieee802154/
 #common clk code
 obj-y				+= clk/
-obj-$(CONFIG_SENSORS_CORE)	+= sensors/
+obj-$(CONFIG_SENSORS_CORE)	+= sensors_samsung/
 obj-$(CONFIG_BATTERY_SAMSUNG)   += battery/
 obj-$(CONFIG_VIBETONZ)		+= motor/
 obj-$(CONFIG_HWSPINLOCK)	+= hwspinlock/
 obj-$(CONFIG_NFC)		+= nfc/
 obj-$(CONFIG_IOMMU_SUPPORT)	+= iommu/
+obj-$(CONFIG_IRDA_MC96)		+= irda/
 obj-$(CONFIG_REMOTEPROC)	+= remoteproc/
 obj-$(CONFIG_RPMSG)		+= rpmsg/
 
@@ -147,3 +148,6 @@ obj-$(CONFIG_MOBICORE_SUPPORT)  += gud/
 obj-$(CONFIG_CORESIGHT)		+= coresight/
 
 obj-$(CONFIG_FELICA)		+= felica/
+
+#sensor_class
+obj-$(CONFIG_SENSORS)		+= sensors/

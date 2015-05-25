@@ -51,7 +51,7 @@ static int msm_mctl_pp_buf_divert(
 	}
 	D("%s: msm_cam_evt_divert_frame=%d",
 		__func__, sizeof(struct msm_cam_evt_divert_frame));
-	memset(&v4l2_evt, 0, sizeof(v4l2_evt));
+	memset(&v4l2_evt, 0, sizeof(struct v4l2_event));
 	v4l2_evt.type = V4L2_EVENT_PRIVATE_START +
 			MSM_CAM_RESP_DIV_FRAME_EVT_MSG;
 	*((uint32_t *)v4l2_evt.u.data) = (uint32_t)isp_event;
@@ -293,9 +293,14 @@ static int msm_mctl_pp_path_to_inst_index(struct msm_cam_v4l2_device *pcam,
 		break;
 	}
 	if ((image_mode >= 0) && pcam->dev_inst_map[image_mode])
+	{
 		return pcam->dev_inst_map[image_mode]->my_index;
+	}
 	else
+	{
+		pr_err("%s image_mode = %d  \n", __func__,image_mode);
 		return -EINVAL;
+	}
 }
 
 int msm_mctl_pp_proc_vpe_cmd(
@@ -680,7 +685,7 @@ int msm_mctl_pp_notify(struct msm_cam_media_controller *p_mctl,
 				pr_err("%s Insufficient memory.", __func__);
 				return -ENOMEM;
 			}
-			memset(&v4l2_evt, 0, sizeof(v4l2_evt));
+			memset(&v4l2_evt, 0, sizeof(struct v4l2_event));
 			*((uint32_t *)v4l2_evt.u.data) = (uint32_t)isp_event;
 
 			/* Get hold of pp event info struct inside event ctrl.*/

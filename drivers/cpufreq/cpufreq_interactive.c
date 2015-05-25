@@ -48,6 +48,7 @@ struct cpufreq_interactive_cpuinfo {
 	u64 time_in_idle_timestamp;
 	u64 cputime_speedadj;
 	u64 cputime_speedadj_timestamp;
+	u64 last_evaluated_jiffy;
 	struct cpufreq_policy *policy;
 	struct cpufreq_frequency_table *freq_table;
 	spinlock_t target_freq_lock; /*protects target freq */
@@ -133,6 +134,15 @@ static int timer_slack_val = DEFAULT_TIMER_SLACK;
 static unsigned long screen_off_max = DEFAULT_SCREEN_OFF_MAX;
 static bool io_is_busy;
 
+/* Round to starting jiffy of next evaluation window */
+static u64 round_to_nw_start(u64 jif)
+{
+	unsigned long step = usecs_to_jiffies(timer_rate);
+
+	do_div(jif, step);
+	return (jif + 1) * step;
+}
+
 /*
  * If the max load among other CPUs is higher than up_threshold_any_cpu_load
  * and if the highest frequency among the other CPUs is higher than
@@ -192,10 +202,10 @@ static inline cputime64_t get_cpu_idle_time(unsigned int cpu,
 	return idle_time;
 }
 
-static void cpufreq_interactive_timer_resched(
-	struct cpufreq_interactive_cpuinfo *pcpu)
+static void cpufreq_interactive_timer_resched(unsigned long cpu)
 {
-	unsigned long expires;
+	struct cpufreq_interactive_cpuinfo *pcpu = &per_cpu(cpuinfo, cpu);
+	u64 expires;
 	unsigned long flags;
 
 	spin_lock_irqsave(&pcpu->load_lock, flags);
@@ -204,12 +214,16 @@ static void cpufreq_interactive_timer_resched(
 				     &pcpu->time_in_idle_timestamp);
 	pcpu->cputime_speedadj = 0;
 	pcpu->cputime_speedadj_timestamp = pcpu->time_in_idle_timestamp;
-	expires = jiffies + usecs_to_jiffies(timer_rate);
-	mod_timer_pinned(&pcpu->cpu_timer, expires);
+	expires = round_to_nw_start(pcpu->last_evaluated_jiffy);
+	del_timer(&pcpu->cpu_timer);
+	pcpu->cpu_timer.expires = expires;
+	add_timer_on(&pcpu->cpu_timer, cpu);
 
 	if (timer_slack_val >= 0 && pcpu->target_freq > pcpu->policy->min) {
 		expires += usecs_to_jiffies(timer_slack_val);
-		mod_timer_pinned(&pcpu->cpu_slack_timer, expires);
+		del_timer(&pcpu->cpu_slack_timer);
+		pcpu->cpu_slack_timer.expires = expires;
+		add_timer_on(&pcpu->cpu_slack_timer, cpu);
 	}
 
 	spin_unlock_irqrestore(&pcpu->load_lock, flags);
@@ -222,9 +236,10 @@ static void cpufreq_interactive_timer_resched(
 static void cpufreq_interactive_timer_start(int cpu)
 {
 	struct cpufreq_interactive_cpuinfo *pcpu = &per_cpu(cpuinfo, cpu);
-	unsigned long expires = jiffies + usecs_to_jiffies(timer_rate);
+	u64 expires = round_to_nw_start(pcpu->last_evaluated_jiffy);
 	unsigned long flags;
 
+	spin_lock_irqsave(&pcpu->load_lock, flags);
 	pcpu->cpu_timer.expires = expires;
 	add_timer_on(&pcpu->cpu_timer, cpu);
 	if (timer_slack_val >= 0 && pcpu->target_freq > pcpu->policy->min) {
@@ -233,7 +248,6 @@ static void cpufreq_interactive_timer_start(int cpu)
 		add_timer_on(&pcpu->cpu_slack_timer, cpu);
 	}
 
-	spin_lock_irqsave(&pcpu->load_lock, flags);
 	pcpu->time_in_idle =
 		get_cpu_idle_time(cpu, &pcpu->time_in_idle_timestamp);
 	pcpu->cputime_speedadj = 0;
@@ -419,6 +433,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 	now = update_load(data);
 	delta_time = (unsigned int)(now - pcpu->cputime_speedadj_timestamp);
 	cputime_speedadj = pcpu->cputime_speedadj;
+	pcpu->last_evaluated_jiffy = get_jiffies_64();
 	spin_unlock_irqrestore(&pcpu->load_lock, flags);
 
 	if (WARN_ON_ONCE(!delta_time))
@@ -427,7 +442,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 	spin_lock_irqsave(&pcpu->target_freq_lock, flags);
 	do_div(cputime_speedadj, delta_time);
 	loadadjfreq = (unsigned int)cputime_speedadj * 100;
-	cpu_load = loadadjfreq / pcpu->target_freq;
+	cpu_load = loadadjfreq / pcpu->policy->cur;
 	pcpu->prev_load = cpu_load;
 	boosted = boost_val || now < boostpulse_endtime;
 
@@ -547,7 +562,7 @@ rearm_if_notmax:
 
 rearm:
 	if (!timer_pending(&pcpu->cpu_timer))
-		cpufreq_interactive_timer_resched(pcpu);
+		cpufreq_interactive_timer_resched(data);
 
 exit:
 	up_read(&pcpu->enable_sem);
@@ -580,7 +595,8 @@ static void cpufreq_interactive_idle_start(void)
 		 * the CPUFreq driver.
 		 */
 		if (!pending) {
-			cpufreq_interactive_timer_resched(pcpu);
+			pcpu->last_evaluated_jiffy = get_jiffies_64();
+			cpufreq_interactive_timer_resched(smp_processor_id());
 
 			now = ktime_to_us(ktime_get());
 			if ((pcpu->policy->cur == pcpu->policy->max) &&
@@ -609,7 +625,7 @@ static void cpufreq_interactive_idle_end(void)
 
 	/* Arm the timer for 1-2 ticks later if not already. */
 	if (!timer_pending(&pcpu->cpu_timer)) {
-		cpufreq_interactive_timer_resched(pcpu);
+		cpufreq_interactive_timer_resched(smp_processor_id());
 	} else if (time_after_eq(jiffies, pcpu->cpu_timer.expires)) {
 		del_timer(&pcpu->cpu_timer);
 		del_timer(&pcpu->cpu_slack_timer);
@@ -728,7 +744,7 @@ static int cpufreq_interactive_notifier(
 	int cpu;
 	unsigned long flags;
 
-	if (val == CPUFREQ_POSTCHANGE) {
+	if (val == CPUFREQ_PRECHANGE) {
 		pcpu = &per_cpu(cpuinfo, freq->cpu);
 		if (!down_read_trylock(&pcpu->enable_sem))
 			return 0;
@@ -874,13 +890,22 @@ static ssize_t store_above_hispeed_delay(
 	struct kobject *kobj, struct attribute *attr, const char *buf,
 	size_t count)
 {
-	int ntokens;
+	int ntokens, i;
 	unsigned int *new_above_hispeed_delay = NULL;
 	unsigned long flags;
 
 	new_above_hispeed_delay = get_tokenized_data(buf, &ntokens);
 	if (IS_ERR(new_above_hispeed_delay))
 		return PTR_RET(new_above_hispeed_delay);
+
+	/* Make sure frequencies are in ascending order. */
+	for (i = 3; i < ntokens; i += 2) {
+		if (new_above_hispeed_delay[i] <=
+		    new_above_hispeed_delay[i - 2]) {
+			kfree(new_above_hispeed_delay);
+			return -EINVAL;
+		}
+	}
 
 	spin_lock_irqsave(&above_hispeed_delay_lock, flags);
 	if (above_hispeed_delay != default_above_hispeed_delay)
@@ -997,12 +1022,18 @@ static ssize_t store_timer_rate(struct kobject *kobj,
 			struct attribute *attr, const char *buf, size_t count)
 {
 	int ret;
-	unsigned long val;
+	unsigned long val, val_round;
 
 	ret = strict_strtoul(buf, 0, &val);
 	if (ret < 0)
 		return ret;
-	timer_rate = val;
+
+	val_round = jiffies_to_usecs(usecs_to_jiffies(val));
+	if (val != val_round)
+		pr_warn("timer_rate not aligned to jiffy. Rounded up to %lu\n",
+				val_round);
+
+	timer_rate = val_round;
 	return count;
 }
 
@@ -1313,6 +1344,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			down_write(&pcpu->enable_sem);
 			del_timer_sync(&pcpu->cpu_timer);
 			del_timer_sync(&pcpu->cpu_slack_timer);
+			pcpu->last_evaluated_jiffy = get_jiffies_64();
 			cpufreq_interactive_timer_start(j);
 			pcpu->governor_enabled = 1;
 			up_write(&pcpu->enable_sem);
@@ -1473,6 +1505,8 @@ static void __exit cpufreq_interactive_exit(void)
 	cpufreq_unregister_governor(&cpufreq_gov_interactive);
 	kthread_stop(speedchange_task);
 	put_task_struct(speedchange_task);
+	if (above_hispeed_delay != default_above_hispeed_delay)
+		kfree(above_hispeed_delay);
 }
 
 module_exit(cpufreq_interactive_exit);

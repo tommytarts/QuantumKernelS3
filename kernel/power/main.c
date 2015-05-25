@@ -69,7 +69,7 @@ static ssize_t pm_async_store(struct kobject *kobj, struct kobj_attribute *attr,
 {
 	unsigned long val;
 
-	if (strict_strtoul(buf, 10, &val))
+	if (kstrtoul(buf, 10, &val))
 		return -EINVAL;
 
 	if (val > 1)
@@ -553,7 +553,6 @@ static int __init pm_init(void)
 	hrtimer_init(&tc_ev_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	tc_ev_timer.function = &tc_ev_stop;
 	tc_ev_processed = 1;
-
 
 	power_kobj = kobject_create_and_add("power", NULL);
 	if (!power_kobj)

@@ -522,7 +522,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 
 	coherent_pool=nn[KMG]	[ARM,KNL]
 			Sets the size of memory pool for coherent, atomic dma
-			allocations if Contiguous Memory Allocator (CMA) is used.
+			allocations, by default set to 256K.
 
 	code_bytes	[X86] How many bytes of object code to print
 			in an oops report.
@@ -988,6 +988,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 	i8042.notimeout	[HW] Ignore timeout condition signalled by controller
 	i8042.reset	[HW] Reset the controller during init and cleanup
 	i8042.unlock	[HW] Unlock (ignore) the keylock
+	i8042.kbdreset  [HW] Reset device connected to KBD port
 
 	i810=		[HW,DRM]
 

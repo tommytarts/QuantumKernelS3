@@ -55,6 +55,10 @@ extern struct rpm_regulator_platform_data msm_rpm_regulator_pdata __devinitdata;
 extern void __init mms_tsp_input_init(void);
 #endif
 
+#if defined(CONFIG_MACH_ESPRESSO_VZW)
+extern void __init usb_switch_init(void);
+#endif
+
 #define PLATFORM_IS_CHARM25() \
 	(machine_is_msm8960_cdp() && \
 		(socinfo_get_platform_subtype() == 1) \
@@ -84,8 +88,10 @@ enum {
 	SX150X_LIQUID,
 };
 
-
-
+#ifdef CONFIG_CAMERON_HEALTH
+extern bool is_cameron_health_connected;
+extern void msm_otg_set_cameronhealth_state(bool enable);
+#endif
 extern struct sx150x_platform_data msm8960_sx150x_data[];
 extern struct msm_camera_board_info msm8960_camera_board_info;
 
@@ -112,9 +118,12 @@ extern int poweroff_charging;
 extern struct msm_rtb_platform_data msm8960_rtb_pdata;
 extern struct msm_cache_dump_platform_data msm8960_cache_dump_pdata;
 extern void msm8960_add_vidc_device(void);
+extern void msm_otg_set_cable_state(int);
 extern void msm_otg_set_vbus_state(int);
-extern void msm_otg_set_charging_state(bool);
-extern void msm_otg_set_id_state(bool);
+extern void msm_otg_set_charging_state(bool enable);
+extern void msm_otg_set_id_state(bool enable);
+extern void msm_otg_set_smartdock_state(bool enable);
+
 
 #if defined(CONFIG_BCM4334) || defined(CONFIG_BCM4334_MODULE)
 int brcm_wlan_init(void);

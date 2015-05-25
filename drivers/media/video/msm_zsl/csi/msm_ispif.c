@@ -11,17 +11,19 @@
  */
 
 #include <linux/delay.h>
-#include <linux/module.h>
 #include <linux/clk.h>
 #include <linux/io.h>
+#include <linux/module.h>
 /*[[ aswoogi_zsl*/
 #include <linux/atomic.h>
 #include <mach/irqs.h>
 /*]]*/
 #include <mach/gpio.h>
 #include <mach/camera.h>
+#include "../msm.h"
 #include "msm_ispif.h"
-#include "msm.h"
+
+
 
 #define QC_TEST
 #define V4L2_IDENT_ISPIF			50001
@@ -402,6 +404,7 @@ static int msm_ispif_abort_intf_transfer(uint8_t intf)
 #ifdef QC_TEST				/*aswoogi_zsl */
 static int msm_ispif_start_intf_transfer(uint8_t intfmask)
 {
+	/*uint32_t data;*/
 	uint8_t intf_cmd_mask = 0x55;
 	int rc = 0;
 

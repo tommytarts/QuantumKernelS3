@@ -13,13 +13,13 @@
 #include <linux/delay.h>
 #include <linux/clk.h>
 #include <linux/io.h>
-#include <mach/board.h>
 #include <linux/module.h>
+#include <mach/board.h>
 #include <mach/camera.h>
 #include <mach/vreg.h>
 #include <media/msm_isp.h>
 #include "msm_csiphy.h"
-#include "msm.h"
+#include "../msm.h"
 
 #define DBG_CSIPHY 0
 
@@ -66,6 +66,9 @@ int msm_csiphy_config(struct csiphy_cfg_params *cfg_params)
 	void __iomem *csiphybase;
 	csiphy_dev = v4l2_get_subdevdata(cfg_params->subdev);
 	csiphybase = csiphy_dev->base;
+	if (csiphybase == NULL)
+		return -ENOMEM;
+
 	csiphy_params = cfg_params->parms;
 	if (csiphy_params->lane_cnt < 1 || csiphy_params->lane_cnt > 4) {
 		CDBG("%s: unsupported lane cnt %d\n",
@@ -111,6 +114,7 @@ int msm_csiphy_config(struct csiphy_cfg_params *cfg_params)
 
 	return rc;
 }
+
 #if DBG_CSIPHY
 static irqreturn_t msm_csiphy_irq(int irq_num, void *data)
 {
@@ -141,6 +145,7 @@ static irqreturn_t msm_csiphy_irq(int irq_num, void *data)
 	return IRQ_HANDLED;
 }
 #endif
+
 static int msm_csiphy_subdev_g_chip_ident(struct v4l2_subdev *sd,
 			struct v4l2_dbg_chip_ident *chip)
 {

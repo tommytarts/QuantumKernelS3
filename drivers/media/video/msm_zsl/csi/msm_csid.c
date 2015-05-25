@@ -11,14 +11,15 @@
  */
 
 #include <linux/delay.h>
-#include <linux/module.h>
 #include <linux/clk.h>
 #include <linux/io.h>
+#include <linux/module.h>
 #include <mach/board.h>
 #include <mach/camera.h>
 #include <media/msm_isp.h>
 #include "msm_csid.h"
-#include "msm.h"
+#include "../msm.h"
+
 
 #define V4L2_IDENT_CSID                            50002
 
@@ -92,6 +93,8 @@ static int msm_csid_config(struct csid_cfg_params *cfg_params)
 	void __iomem *csidbase;
 	csid_dev = v4l2_get_subdevdata(cfg_params->subdev);
 	csidbase = csid_dev->base;
+	if (csidbase == NULL)
+		return -ENOMEM;
 	csid_params = cfg_params->parms;
 	val = csid_params->lane_cnt - 1;
 	val |= csid_params->lane_assign << 2;
@@ -131,6 +134,7 @@ static irqreturn_t msm_csid_irq(int irq_num, void *data)
 	return IRQ_HANDLED;
 }
 #endif
+
 static int msm_csid_subdev_g_chip_ident(struct v4l2_subdev *sd,
 			struct v4l2_dbg_chip_ident *chip)
 {
@@ -322,10 +326,10 @@ static int __devinit csid_probe(struct platform_device *pdev)
 	return 0;
 #if 0
 ioremap_fail:
-#endif	
+#endif
 csid_no_resource:
 	release_mem_region(new_csid_dev->mem->start,
-			resource_size(new_csid_dev->mem));
+		resource_size(new_csid_dev->mem));
 	mutex_destroy(&new_csid_dev->mutex);
 	kfree(new_csid_dev);
 	return 0;

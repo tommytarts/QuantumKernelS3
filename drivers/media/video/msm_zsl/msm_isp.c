@@ -151,6 +151,7 @@ static int msm_isp_notify_vfe(struct v4l2_subdev *sd,
 		(struct msm_sync *)v4l2_get_subdev_hostdata(sd);
 	struct msm_cam_media_controller *pmctl = NULL;
 	struct msm_free_buf buf;
+        memset(&v4l2_evt,0,sizeof(struct v4l2_event));
 
 	v4l2_evt.id = 0;
 	if (!sync) {

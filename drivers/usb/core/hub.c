@@ -56,6 +56,9 @@ int HostTest;
 EXPORT_SYMBOL(HostTest);
 #endif
 
+#ifdef CONFIG_USB_HOST_NOTIFY
+#include "sec-dock.h"
+#endif
 
 /* if we are in debug mode, always announce new devices */
 #ifdef DEBUG
@@ -1681,8 +1684,10 @@ void usb_set_device_state(struct usb_device *udev,
 					|| new_state == USB_STATE_SUSPENDED)
 				;	/* No change to wakeup settings */
 			else if (new_state == USB_STATE_CONFIGURED)
-				wakeup = udev->actconfig->desc.bmAttributes
-					 & USB_CONFIG_ATT_WAKEUP;
+				wakeup = (udev->quirks &
+					USB_QUIRK_IGNORE_REMOTE_WAKEUP) ? 0 :
+					udev->actconfig->desc.bmAttributes &
+					USB_CONFIG_ATT_WAKEUP;
 			else
 				wakeup = 0;
 		}
@@ -1813,6 +1818,9 @@ void usb_disconnect(struct usb_device **pdev)
 		cancel_delayed_work_sync(&udev->bus->hnp_polling);
 		udev->bus->hnp_support = 0;
 	}
+#endif
+#ifdef CONFIG_USB_HOST_NOTIFY
+	call_battery_notify(udev, 0);
 #endif
 
 	usb_lock_device(udev);
@@ -2129,6 +2137,13 @@ int usb_new_device(struct usb_device *udev)
 
 	/* Tell the world! */
 	announce_device(udev);
+#ifdef CONFIG_USB_HOST_NOTIFY
+#if defined(CONFIG_MUIC_MAX77693_SUPPORT_OTG_AUDIO_DOCK)
+	call_audiodock_notify(udev);
+#endif
+	call_battery_notify(udev, 1);
+#endif
+
 
 	if (udev->serial)
 		add_device_randomness(udev->serial, strlen(udev->serial));
@@ -3486,6 +3501,9 @@ check_highspeed (struct usb_hub *hub, struct usb_device *udev, int port1)
 {
 	struct usb_qualifier_descriptor	*qual;
 	int				status;
+
+	if (udev->quirks & USB_QUIRK_DEVICE_QUALIFIER)
+		return;
 
 	qual = kmalloc (sizeof *qual, GFP_KERNEL);
 	if (qual == NULL)

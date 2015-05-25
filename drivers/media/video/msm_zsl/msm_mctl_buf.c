@@ -26,7 +26,7 @@
 #include <linux/android_pmem.h>
 
 #include "msm.h"
-#include "msm_ispif.h"
+#include "csi/msm_ispif.h"
 
 #ifdef CONFIG_MSM_CAMERA_DEBUG
 #define D(fmt, args...) pr_debug("msm_mctl_buf: " fmt, ##args)
@@ -34,7 +34,8 @@
 #define D(fmt, args...) do {} while (0)
 #endif
 
-static int msm_vb2_ops_queue_setup(struct vb2_queue *vq, const struct v4l2_format *fmt,
+static int msm_vb2_ops_queue_setup(struct vb2_queue *vq,
+					const struct v4l2_format *fmt,
 					unsigned int *num_buffers,
 					unsigned int *num_planes,
 					unsigned int sizes[],
@@ -53,11 +54,11 @@ static int msm_vb2_ops_queue_setup(struct vb2_queue *vq, const struct v4l2_forma
 
 	*num_planes = pcam_inst->plane_info.num_planes;
 	for (i = 0; i < pcam_inst->vid_fmt.fmt.pix_mp.num_planes; i++) {
-		sizes[i] = PAGE_ALIGN(pcam_inst->plane_info.plane[i].size);
-		D("%s Inst %p : Plane %d Offset = %d Size = %ld"
-			"Aligned Size = %u", __func__, pcam_inst, i,
+		sizes[i] = (pcam_inst->plane_info.plane[i].size);
+		D("%s Inst %p : Plane %d Offset = %d Size = %x"
+			"Aligned Size = %x", __func__, pcam_inst, i,
 			pcam_inst->plane_info.plane[i].offset,
-			pcam_inst->plane_info.plane[i].size, sizes[i]);
+			(unsigned int)pcam_inst->plane_info.plane[i].size,(unsigned int) sizes[i]);
 	}
 	return 0;
 }
@@ -122,8 +123,7 @@ static int msm_vb2_ops_buf_init(struct vb2_buffer *vb)
 			rc = videobuf2_pmem_contig_user_get(mem, &offset,
 				buf_type,
 				pcam_inst->buf_offset[buf_idx][i].addr_offset,
-				pcam_inst->path, pcam->mctl.client,
-				CAMERA_DOMAIN);
+				pcam_inst->path, pcam->mctl.client, pcam->mctl.sync.domain_num);
 		else
 			rc = videobuf2_pmem_contig_mmap_get(mem, &offset,
 				buf_type, pcam_inst->path);
@@ -249,12 +249,12 @@ static void msm_vb2_ops_buf_cleanup(struct vb2_buffer *vb)
 	}
 	for (i = 0; i < vb->num_planes; i++) {
 		mem = vb2_plane_cookie(vb, i);
-		videobuf2_pmem_contig_user_put(mem, pcam->mctl.client, CAMERA_DOMAIN);
+		videobuf2_pmem_contig_user_put(mem, pcam->mctl.client, pcam->mctl.sync.domain_num);
 	}
 	buf->state = MSM_BUFFER_STATE_UNUSED;
 }
 
-static int msm_vb2_ops_start_streaming(struct vb2_queue *q, unsigned int count)
+static int msm_vb2_ops_start_streaming(struct vb2_queue *q,unsigned int count)
 {
 	return 0;
 }
@@ -343,9 +343,14 @@ int msm_mctl_out_type_to_inst_index(struct msm_cam_v4l2_device *pcam,
 		break;
 	}
 	if ((image_mode >= 0) && pcam->dev_inst_map[image_mode])
+	{
 		return pcam->dev_inst_map[image_mode]->my_index;
+	}
 	else
+	{
+		pr_err("%s image_mode = %d \n", __func__,image_mode);
 		return -EINVAL;
+	}
 }
 
 void msm_mctl_gettimeofday(struct timeval *tv)
@@ -568,10 +573,10 @@ int msm_mctl_reserve_free_buf(
 			idx, pcam_inst,	buf->vidbuf.v4l2_buf.index,
 			free_buf->ch_paddr[0], free_buf->ch_paddr[1]);
 
+#if 0
 		/* CACHABLE_MEMORY */
 		/*invalidate cache if required*/
-#if defined(CACHABLE_MEMORY)
-		if (mem && (ION_IS_CACHED(mem->ion_flags)))
+		if (mem && (ION_IS_CACHED(mem->ion_flags) == CACHED))
 			invalidate_caches((unsigned long)mem->kernel_vaddr,
 			mem->size, (unsigned long)mem->phyaddr);
 #endif

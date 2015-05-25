@@ -11,15 +11,16 @@
  */
 
 #include <linux/uaccess.h>
-#include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/io.h>
+#include <linux/module.h>
 #include <linux/atomic.h>
 #include <linux/regulator/consumer.h>
 #include <linux/clk.h>
 #include <mach/irqs.h>
 #include <mach/camera.h>
+#include <mach/iommu.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-subdev.h>
 #include <media/msm_isp.h>
@@ -29,9 +30,10 @@
 
 #include "msm.h"
 #include "msm_vfe32.h"
-#include "msm_ispif.h"		/*aswoogi_zsl */
+#include "csi/msm_ispif.h"		/*aswoogi_zsl */
 
 atomic_t irq_cnt;
+extern unsigned int open_fail_flag;
 
 #define QC_TEST
 
@@ -60,7 +62,9 @@ atomic_t irq_cnt;
 	(((ping_pong) & (1 << (chn))) == 0 ?   \
 	vfe32_put_ch_pong_addr((chn), (addr)) : \
 	vfe32_put_ch_ping_addr((chn), (addr)))
-
+#if defined(CONFIG_MSM_IOMMU) && defined(VFE_IOMMU_FAULT_HANDLER)
+static atomic_t fault_recovery;
+#endif
 static void vfe32_set_default_reg_values(void);
 static struct vfe32_ctrl_type *vfe32_ctrl;
 static void *vfe_syncdata;
@@ -808,6 +812,7 @@ static void vfe32_start_common(uint16_t operation_mode)
 				   (void *)ISPIF_STREAM(PIX_0,
 					ISPIF_ON_FRAME_BOUNDARY));
 	}
+	pr_err("Update Command Sent ");
 	atomic_set(&vfe32_ctrl->vstate, 1);
 }
 #else
@@ -1457,7 +1462,7 @@ static int vfe32_proc_general(struct msm_isp_cmd *cmd)
 	CDBG("vfe32_proc_general: cmdID = %s, length = %d\n",
 	     vfe32_general_cmd[cmd->id], cmd->length);
 
-	if (vfe32_ctrl->vfebase == NULL) {
+	if (vfe32_ctrl->vfebase == NULL || open_fail_flag) {
 	    pr_err("Error : vfe32_ctrl->vfebase is NULL!!\n");
 	    pr_err("vfe32_proc_general: cmdID = %s, length = %d\n",
 		 vfe32_general_cmd[cmd->id], cmd->length);
@@ -2757,6 +2762,7 @@ static void vfe32_process_reg_update_irq(void)
 	if (vfe32_ctrl->start_ack_pending == TRUE) {
 		vfe32_send_isp_msg(vfe32_ctrl, MSG_ID_START_ACK);
 		vfe32_ctrl->start_ack_pending = FALSE;
+		pr_err("Update ack received");
 	} else {
 		if (vfe32_ctrl->recording_state ==
 			VFE_REC_STATE_STOP_REQUESTED) {
@@ -3174,9 +3180,9 @@ static void vfe32_process_zsl_frame(void)
 		    no_free_buffer_count++;
 		else
 		    no_free_buffer_count = 0;
-		CDBG("count %x\n", no_free_buffer_count);
-		CDBG("time_diff %x, tv_msec %ld, pre_frame_msec %ld\n",
-		       time_diff, TV_MSEC(tv.tv_nsec), pre_frame_msec);
+		CDBG("count %d\n", no_free_buffer_count);
+	/*	CDBG("time_diff %d, tv_msec %d, pre_frame_msec %d\n",
+		       time_diff, TV_MSEC(tv.tv_nsec), pre_frame_msec);*/
 		/* max 66msec * 60 = 3960msec */
 		/* min 33msec * 60 = 1980msec */
 		if (no_free_buffer_count > 60)
@@ -3184,13 +3190,20 @@ static void vfe32_process_zsl_frame(void)
 		else
 		    no_free_buffer_flag = 0;
 	    }
-	    
 	    if (no_free_buffer_flag) {
 		if (!s_avail)
-		    pr_err("%d : nishu zsl no free snapshot buffer\n", __LINE__);
+		{
+			if(printk_ratelimit())
+				pr_err("%d : nishu zsl no free snapshot buffer\n", __LINE__);
+		}
 		if (!t_avail)
-		    pr_err("%d : nishu zsl no free thumbnail buffer\n", __LINE__);
-	    } else {
+		{
+			if(printk_ratelimit())
+				pr_err("%d : nishu zsl no free thumbnail buffer\n", __LINE__);
+		}
+	    }
+	    else
+	    {
 		if (!s_avail)
 		    CDBG("nishu zsl no free snapshot buffer\n");
 		if (!t_avail)
@@ -3198,8 +3211,7 @@ static void vfe32_process_zsl_frame(void)
 	    }
 	    pre_frame_sec = tv.tv_sec;
 	    pre_frame_msec = TV_MSEC(tv.tv_nsec);
-
-		return;
+	    return;
 	}
 	pre_frame_sec = 0;
 	pre_frame_msec = 0;
@@ -3269,9 +3281,12 @@ static void vfe32_process_zsl_frame(void)
 			vfe32_put_ch_addr(ping_pong,
 					  vfe32_ctrl->outpath.out2.ch2,
 					  free_buf_s->ch_paddr[2]);
-		CDBG("mainimg put ch0_paddr = 0x%x", free_buf_t->ch_paddr[0]);
-		CDBG("mainimg put ch1_paddr = 0x%x", free_buf_t->ch_paddr[1]);
-		CDBG("mainimg put ch2_paddr = 0x%x", free_buf_t->ch_paddr[2]);
+		if(free_buf_t)
+		{
+			CDBG("mainimg put ch0_paddr = 0x%x", free_buf_t->ch_paddr[0]);
+			CDBG("mainimg put ch1_paddr = 0x%x", free_buf_t->ch_paddr[1]);
+			CDBG("mainimg put ch2_paddr = 0x%x", free_buf_t->ch_paddr[2]);
+		}
 
 		vfe_send_outmsg(&vfe32_ctrl->subdev,
 				MSG_ID_OUTPUT_S, ch0_paddr,
@@ -4298,7 +4313,7 @@ int msm_vfe_subdev_init(struct v4l2_subdev *sd, void *data,
 
 	if (vfe32_ctrl->fs_vfe == NULL) {
 		vfe32_ctrl->fs_vfe =
-		    regulator_get(&vfe32_ctrl->pdev->dev, "vdd");
+		    regulator_get(&vfe32_ctrl->pdev->dev, "fs_vfe");
 		if (IS_ERR(vfe32_ctrl->fs_vfe)) {
 			pr_err("%s: Regulator FS_VFE get failed %ld\n",
 			       __func__, PTR_ERR(vfe32_ctrl->fs_vfe));

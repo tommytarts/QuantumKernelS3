@@ -332,8 +332,8 @@ static struct msm_gpiomux_config msm8960_sec_ts_configs[] = {
 #define MSM_HDMI_PRIM_PMEM_SIZE 0x4000000 /* 64 Mbytes */
 
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-#define HOLE_SIZE	0x20000
-#define MSM_CONTIG_MEM_SIZE  0x65000
+#define HOLE_SIZE	0x100000 /* 1 MB */
+#define MSM_CONTIG_MEM_SIZE  0x280000 /* 2.5MB */
 #ifdef CONFIG_MSM_IOMMU
 #define MSM_ION_MM_SIZE            0x6000000
 #define MSM_ION_SF_SIZE            0x0
@@ -353,7 +353,7 @@ static struct msm_gpiomux_config msm8960_sec_ts_configs[] = {
 #define MSM_ION_HEAP_NUM	8
 #endif
 #endif
-#define MSM_ION_MM_FW_SIZE	(0x200000 - HOLE_SIZE) /* 128kb */
+#define MSM_ION_MM_FW_SIZE	0x200000 /* 2 MB */
 #define MSM_ION_MFC_SIZE	SZ_8K
 #define MSM_ION_AUDIO_SIZE	MSM_PMEM_AUDIO_SIZE
 
@@ -361,12 +361,11 @@ static struct msm_gpiomux_config msm8960_sec_ts_configs[] = {
 #define MSM_LIQUID_ION_SF_SIZE MSM_LIQUID_PMEM_SIZE
 #define MSM_HDMI_PRIM_ION_SF_SIZE MSM_HDMI_PRIM_PMEM_SIZE
 
-#define MSM_MM_FW_SIZE      (0x200000 - HOLE_SIZE) /* 2mb -128kb*/
-#define MSM8960_FIXED_AREA_START (0xa0000000 - (MSM_ION_MM_FW_SIZE + \
-                            HOLE_SIZE))
-#define MAX_FIXED_AREA_SIZE 0x10000000
-#define MSM8960_FW_START    MSM8960_FIXED_AREA_START
-#define MSM_ION_ADSP_SIZE   SZ_8M
+#define MSM_MM_FW_SIZE		(0x200000) /* 2mb */
+#define MSM8960_FIXED_AREA_START (0xb0000000 - MSM_ION_MM_FW_SIZE)
+#define MAX_FIXED_AREA_SIZE	0x10000000
+#define MSM8960_FW_START	MSM8960_FIXED_AREA_START
+#define MSM_ION_ADSP_SIZE	SZ_8M
 
 static unsigned msm_ion_sf_size = MSM_ION_SF_SIZE;
 #else
@@ -738,6 +737,9 @@ static void __init msm8960_reserve_fixed_area(unsigned long fixed_area_size)
 
 	ret = memblock_remove(reserve_info->fixed_area_start,
 		reserve_info->fixed_area_size);
+	pr_info("mem_map: fixed_area reserved at 0x%lx with size 0x%lx\n",
+			reserve_info->fixed_area_start,
+			reserve_info->fixed_area_size);
 	BUG_ON(ret);
 #endif
 }
@@ -846,7 +848,7 @@ static void __init reserve_ion_memory(void)
 					heap->priv,
 					heap->size,
 					0,
-					0xa0000000);
+					0xb0000000);
 			}
 		}
 	}
@@ -868,7 +870,10 @@ static void __init reserve_ion_memory(void)
 	} else {
 		BUG_ON(!IS_ALIGNED(fixed_low_size + HOLE_SIZE, SECTION_SIZE));
 		ret = memblock_remove(fixed_low_start,
-					  fixed_low_size + HOLE_SIZE);
+				      fixed_low_size + HOLE_SIZE);
+		pr_info("mem_map: fixed_low_area reserved at 0x%lx with size \
+				0x%x\n", fixed_low_start,
+				fixed_low_size + HOLE_SIZE);
 		BUG_ON(ret);
 	}
 
@@ -879,6 +884,9 @@ static void __init reserve_ion_memory(void)
 	} else {
 		BUG_ON(!IS_ALIGNED(fixed_middle_size, SECTION_SIZE));
 		ret = memblock_remove(fixed_middle_start, fixed_middle_size);
+		pr_info("mem_map: fixed_middle_area reserved at 0x%lx with \
+				size 0x%x\n", fixed_middle_start,
+				fixed_middle_size);
 		BUG_ON(ret);
 	}
 
@@ -890,6 +898,9 @@ static void __init reserve_ion_memory(void)
 		/* This is the end of the fixed area so it's okay to round up */
 		fixed_high_size = ALIGN(fixed_high_size, SECTION_SIZE);
 		ret = memblock_remove(fixed_high_start, fixed_high_size);
+		pr_info("mem_map: fixed_high_area reserved at 0x%lx with size \
+				0x%x\n", fixed_high_start,
+				fixed_high_size);
 		BUG_ON(ret);
 	}
 
@@ -1006,6 +1017,8 @@ static void reserve_cache_dump_memory(void)
 
 	msm8960_reserve_table[MEMTYPE_EBI1].size += total;
 	msm_cache_dump_pdata.l1_size = l1_size;
+	pr_info("mem_map: cache_dump reserved with size 0x%x in pool\n",
+			total);
 #endif
 }
 
@@ -1260,7 +1273,11 @@ static void fsa9485_otg_cb(bool attached)
 
 	if (attached) {
 		pr_info("%s set id state\n", __func__);
-//		msm_otg_set_id_state(attached);
+		msm_otg_set_id_state(0);
+	}
+	else {
+		pr_info("%s set id state\n", __func__);
+		msm_otg_set_id_state(1);
 	}
 }
 
@@ -1274,10 +1291,10 @@ static void fsa9485_usb_cb(bool attached)
 	set_cable_status = attached ? CABLE_TYPE_USB : CABLE_TYPE_NONE;
 
 	if (system_rev >= 0x9) {
-//		if (attached) {
+
 			pr_info("%s set vbus state\n", __func__);
 			msm_otg_set_vbus_state(attached);
-//		}
+
 	}
 
 	for (i = 0; i < 10; i++) {
@@ -1502,15 +1519,50 @@ static void fsa9485_smartdock_cb(bool attached)
 		pr_err("%s: fail to set power_suppy ONLINE property(%d)\n",
 			__func__, ret);
 	}
-
-//	msm_otg_set_smartdock_state(attached);
+	msm_otg_set_smartdock_state(0);
 }
 
 static void fsa9485_audio_dock_cb(bool attached)
 {
+	union power_supply_propval value;
+	int i, ret = 0;
+	struct power_supply *psy;
+
 	pr_info("fsa9485_audio_dock_cb attached %d\n", attached);
 
-//	msm_otg_set_smartdock_state(attached);
+	set_cable_status =
+		attached ? CABLE_TYPE_AC : CABLE_TYPE_NONE;
+
+	for (i = 0; i < 10; i++) {
+		psy = power_supply_get_by_name("battery");
+		if (psy)
+			break;
+	}
+	if (i == 10) {
+		pr_err("%s: fail to get battery ps\n", __func__);
+		return;
+	}
+
+	switch (set_cable_status) {
+	case CABLE_TYPE_AC:
+		value.intval = POWER_SUPPLY_TYPE_MAINS;
+		break;
+	case CABLE_TYPE_NONE:
+		value.intval = POWER_SUPPLY_TYPE_BATTERY;
+		break;
+	default:
+		pr_err("invalid status:%d\n", attached);
+		return;
+	}
+
+	ret = psy->set_property(psy, POWER_SUPPLY_PROP_ONLINE,
+		&value);
+	if (ret) {
+		pr_err("%s: fail to set power_suppy ONLINE property(%d)\n",
+			__func__, ret);
+	}
+
+	msm_otg_set_smartdock_state(0);
 }
 
 static int fsa9485_dock_init(void)
@@ -1540,7 +1592,7 @@ int msm8960_get_cable_type(void)
 	}
 	if (i == 10) {
 		pr_err("%s: fail to get battery ps\n", __func__);
-		return -1;
+		return 0;
 	}
 #endif
 
@@ -2272,6 +2324,19 @@ static struct i2c_board_info sns_i2c_borad_info[] = {
 
 #if defined(CONFIG_MPU_SENSORS_MPU6050B1) || \
 	defined(CONFIG_MPU_SENSORS_MPU6050B1_411)
+/* Hack: L710T needs I535 sensor data, but identifies as BOARD_REV14 (L710).
+ * Use samsung.hardware param to handle this.
+ */
+static int is_l710t __initdata = 0;
+static int __init detect_l710t(char *str)
+{
+	if (!strcmp(str, "SPH-L710T"))
+		is_l710t = 1;
+
+	return 0;
+}
+early_param("samsung.hardware", detect_l710t);
+
 static void mpl_init(void)
 {
 	int ret = 0;
@@ -2288,7 +2353,10 @@ static void mpl_init(void)
 		mpu_data = mpu_data_00;
 	mpu_data.reset = gpio_rev(GPIO_MAG_RST);
 #elif defined(CONFIG_MPU_SENSORS_MPU6050B1_411)
-	if (system_rev == BOARD_REV14) {
+	if (system_rev == BOARD_REV14 && is_l710t) {
+		mpu6050_data = mpu6050_data_vzw;
+		inv_mpu_ak8963_data = inv_mpu_ak8963_data_vzw;
+	} else if (system_rev == BOARD_REV14) {
 		mpu6050_data = mpu6050_data_spr;
 		inv_mpu_ak8963_data = inv_mpu_ak8963_data_spr;
 	} else if (system_rev == BOARD_REV15) {
